@@ -1,0 +1,148 @@
+.import-card {
+  padding: 28px;
+  border: 1px solid var(--color-border);
+  border-radius: 24px;
+  background: var(--color-surface);
+  box-shadow: 0 24px 70px rgba(29, 37, 49, 0.06);
+}
+
+.import-card__heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 24px;
+}
+
+.import-card h2 {
+  margin: 0 0 6px;
+  font-size: 1.125rem;
+  letter-spacing: -0.02em;
+}
+
+.import-card__heading p {
+  margin: 0;
+  color: var(--color-muted);
+  font-size: 0.875rem;
+}
+
+.status-badge {
+  flex: none;
+  padding: 7px 10px;
+  border-radius: 999px;
+  background: var(--color-accent-soft);
+  color: var(--color-accent-dark);
+  font-size: 0.75rem;
+  font-weight: 650;
+}
+
+.file-picker {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 16px;
+  min-height: 112px;
+  padding: 20px;
+  border: 1px dashed #bcc5ce;
+  border-radius: 16px;
+  background: var(--color-surface-muted);
+}
+
+.file-picker__icon {
+  display: grid;
+  width: 48px;
+  height: 48px;
+  place-items: center;
+  border-radius: 14px;
+  background: var(--color-surface);
+  color: var(--color-accent-dark);
+  box-shadow: 0 5px 20px rgba(29, 37, 49, 0.08);
+}
+
+.file-picker__icon svg {
+  width: 22px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  stroke-width: 1.8;
+}
+
+.file-picker__copy {
+  display: grid;
+  min-width: 0;
+  gap: 5px;
+}
+
+.file-picker__copy strong,
+.file-picker__copy span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-picker__copy strong {
+  font-size: 0.9375rem;
+}
+
+.file-picker__copy span {
+  color: var(--color-muted);
+  font-size: 0.8125rem;
+}
+
+.button {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  padding: 0 18px;
+  border-radius: 12px;
+  background: var(--color-text);
+  color: #fff;
+  cursor: pointer;
+  font-size: 0.875rem;
+  font-weight: 650;
+  transition: background-color 160ms ease, transform 160ms ease;
+}
+
+.button:hover {
+  background: var(--color-accent-dark);
+}
+
+.button:active {
+  transform: translateY(1px);
+}
+
+.button:focus-within {
+  outline: 3px solid rgba(82, 119, 91, 0.25);
+  outline-offset: 3px;
+}
+
+@media (max-width: 640px) {
+  .import-card {
+    padding: 20px;
+    border-radius: 20px;
+  }
+
+  .import-card__heading {
+    display: grid;
+    margin-bottom: 20px;
+  }
+
+  .status-badge {
+    justify-self: start;
+  }
+
+  .file-picker {
+    grid-template-columns: auto minmax(0, 1fr);
+    min-height: 0;
+    padding: 16px;
+  }
+
+  .button {
+    grid-column: 1 / -1;
+    width: 100%;
+    margin-top: 4px;
+  }
+}
+

@@ -1,0 +1,131 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="theme-color" content="#f4f5f7" />
+    <meta
+      name="description"
+      content="Адаптивное приложение для загрузки Excel-файлов и просмотра данных"
+    />
+    <title>Retail Analytic</title>
+    <link rel="stylesheet" href="./standalone.css" />
+    <script defer src="./vendor/xlsx.full.min.js"></script>
+    <script defer src="./vendor/jszip.min.js"></script>
+    <script defer src="./vendor/html2canvas.min.js"></script>
+    <script defer src="./vendor/jspdf.umd.min.js"></script>
+    <script defer src="./standalone.js"></script>
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="site-header">
+        <a class="brand" href="./index.html" aria-label="Retail Analytic — на главную">
+          <span class="brand__mark" aria-hidden="true">R</span>
+          <span>Retail Analytic</span>
+        </a>
+        <span class="site-header__caption">Импорт и просмотр данных</span>
+      </header>
+
+      <main class="workspace">
+        <section class="import-card" aria-labelledby="import-title">
+          <div class="import-card__heading">
+            <div>
+              <h2 id="import-title">Загрузка файла</h2>
+              <p>Поддерживаются форматы XLSX и XLS</p>
+            </div>
+            <span class="status-badge">Основа готова</span>
+          </div>
+
+          <div class="file-inputs">
+            <div class="file-field">
+              <span class="file-field__label">Предыдущая неделя</span>
+              <div class="file-picker" id="file-picker">
+                <div class="file-picker__icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24">
+                    <path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5M5 14v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4" />
+                  </svg>
+                </div>
+
+                <div class="file-picker__copy" aria-live="polite">
+                  <strong id="file-name">Выберите Excel-файл</strong>
+                  <span id="file-description">Из него считаем разницу</span>
+                </div>
+
+                <label class="button" for="excel-file" id="file-button">Выбрать файл</label>
+                <input
+                  id="excel-file"
+                  class="visually-hidden"
+                  type="file"
+                  accept=".xlsx,.xls,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                />
+              </div>
+            </div>
+
+            <div class="file-field">
+              <span class="file-field__label">Текущая неделя</span>
+              <div class="file-picker" id="comparison-file-picker">
+                <div class="file-picker__icon" aria-hidden="true">
+                  <svg viewBox="0 0 24 24">
+                    <path d="M12 16V4m0 0L7.5 8.5M12 4l4.5 4.5M5 14v4a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2v-4" />
+                  </svg>
+                </div>
+
+                <div class="file-picker__copy" aria-live="polite">
+                  <strong id="comparison-file-name">Выберите второй Excel-файл</strong>
+                  <span id="comparison-file-description">Покажем все значения из него</span>
+                </div>
+
+                <label class="button" for="comparison-excel-file" id="comparison-file-button">Выбрать файл</label>
+                <input
+                  id="comparison-excel-file"
+                  class="visually-hidden"
+                  type="file"
+                  accept=".xlsx,.xls,application/vnd.ms-excel,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+                />
+              </div>
+            </div>
+          </div>
+
+          <div class="import-actions">
+            <p class="feedback" id="feedback" aria-live="polite"></p>
+            <button class="button button--confirm" id="confirm-button" type="button" hidden>
+              Подтвердить и показать таблицу
+            </button>
+          </div>
+
+          <div class="debug-panel" id="debug-panel" hidden>
+            <p class="debug-panel__title">DEBUG · Не найдены обязательные столбцы:</p>
+            <ul class="debug-panel__list" id="debug-list"></ul>
+          </div>
+        </section>
+
+        <section class="results" id="results" aria-labelledby="results-title" hidden>
+          <div class="results__heading">
+            <div>
+              <p class="eyebrow">Retail</p>
+              <h2 id="results-title">Данные из файла</h2>
+            </div>
+            <div class="results__actions">
+              <span class="results__meta" id="results-meta"></span>
+              <button class="button button--export" id="export-pdf-button" type="button" disabled>
+                <svg viewBox="0 0 24 24" aria-hidden="true">
+                  <path d="M7 3h7l4 4v14H7V3Zm7 0v5h5M9.5 13h5M9.5 17h5" />
+                </svg>
+                Экспорт в PDF
+              </button>
+            </div>
+          </div>
+
+          <div class="table-scroll" tabindex="0" aria-label="Таблица данных из Excel">
+            <table>
+              <thead id="table-head"></thead>
+              <tbody id="table-body"></tbody>
+            </table>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <noscript>Для выбора файла включите JavaScript в браузере.</noscript>
+  </body>
+</html>
