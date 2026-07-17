@@ -931,8 +931,104 @@
     'Остатки (Арвато основной), шт': true,
   }
 
-  function exportTableToExcel() {
-    if (typeof XLSX === 'undefined') {
+  // Индексы стилей в styles.xml (см. buildStylesXml): 0 — обычный, 1 — жирный заголовок,
+  // 2 — зелёный (рост), 3 — красный (падение). Цвета совпадают с экраном.
+  var EXCEL_STYLE_DEFAULT = 0
+  var EXCEL_STYLE_HEADER = 1
+  var EXCEL_STYLE_POSITIVE = 2
+  var EXCEL_STYLE_NEGATIVE = 3
+
+  function escapeXml(value) {
+    return String(value)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+  }
+
+  function excelColumnLetter(index) {
+    var letter = ''
+    var n = index
+    while (n >= 0) {
+      letter = String.fromCharCode((n % 26) + 65) + letter
+      n = Math.floor(n / 26) - 1
+    }
+    return letter
+  }
+
+  function buildStylesXml() {
+    return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<styleSheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
+      '<fonts count="4">' +
+      '<font><sz val="11"/><name val="Calibri"/></font>' +
+      '<font><b/><sz val="11"/><name val="Calibri"/></font>' +
+      '<font><b/><color rgb="FF288447"/><sz val="11"/><name val="Calibri"/></font>' +
+      '<font><b/><color rgb="FFBD3434"/><sz val="11"/><name val="Calibri"/></font>' +
+      '</fonts>' +
+      '<fills count="2"><fill><patternFill patternType="none"/></fill>' +
+      '<fill><patternFill patternType="gray125"/></fill></fills>' +
+      '<borders count="1"><border><left/><right/><top/><bottom/><diagonal/></border></borders>' +
+      '<cellStyleXfs count="1"><xf numFmtId="0" fontId="0" fillId="0" borderId="0"/></cellStyleXfs>' +
+      '<cellXfs count="4">' +
+      '<xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>' +
+      '<xf numFmtId="0" fontId="1" fillId="0" borderId="0" xfId="0" applyFont="1"/>' +
+      '<xf numFmtId="0" fontId="2" fillId="0" borderId="0" xfId="0" applyFont="1"/>' +
+      '<xf numFmtId="0" fontId="3" fillId="0" borderId="0" xfId="0" applyFont="1"/>' +
+      '</cellXfs>' +
+      '<cellStyles count="1"><cellStyle name="Normal" xfId="0" builtinId="0"/></cellStyles>' +
+      '</styleSheet>'
+  }
+
+  function buildSheetXml(matrix, columnWidths) {
+    var colsXml = '<cols>'
+    columnWidths.forEach(function (width, index) {
+      colsXml += '<col min="' + (index + 1) + '" max="' + (index + 1) +
+        '" width="' + width + '" customWidth="1"/>'
+    })
+    colsXml += '</cols>'
+
+    var rowsXml = ''
+    matrix.forEach(function (row, rowIndex) {
+      var rowNumber = rowIndex + 1
+      var cellsXml = ''
+
+      row.forEach(function (cell, columnIndex) {
+        var reference = excelColumnLetter(columnIndex) + rowNumber
+        var styleAttr = cell.style ? ' s="' + cell.style + '"' : ''
+
+        if (cell.type === 'number') {
+          cellsXml += '<c r="' + reference + '"' + styleAttr + '><v>' + cell.value + '</v></c>'
+        } else if (cell.value === '') {
+          cellsXml += '<c r="' + reference + '"' + styleAttr + '/>'
+        } else {
+          cellsXml += '<c r="' + reference + '"' + styleAttr +
+            ' t="inlineStr"><is><t xml:space="preserve">' + escapeXml(cell.value) + '</t></is></c>'
+        }
+      })
+
+      rowsXml += '<row r="' + rowNumber + '">' + cellsXml + '</row>'
+    })
+
+    return '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
+      colsXml + '<sheetData>' + rowsXml + '</sheetData></worksheet>'
+  }
+
+  function downloadBlob(blob, filename) {
+    var url = URL.createObjectURL(blob)
+    var link = document.createElement('a')
+    link.href = url
+    link.download = filename
+    document.body.appendChild(link)
+    link.click()
+    document.body.removeChild(link)
+    setTimeout(function () {
+      URL.revokeObjectURL(url)
+    }, 1000)
+  }
+
+  async function exportTableToExcel() {
+    if (typeof JSZip === 'undefined') {
       throw new Error('Не удалось загрузить модуль экспорта Excel.')
     }
 
@@ -941,7 +1037,8 @@
     }
 
     // Читаем уже собранную на экране таблицу, пропуская служебную колонку действий.
-    var headers = Array.from(tableHead.querySelectorAll('th')).slice(1).map(function (cell) {
+    var headerCells = Array.from(tableHead.querySelectorAll('th')).slice(1)
+    var headers = headerCells.map(function (cell) {
       return cell.textContent.trim()
     })
 
@@ -950,33 +1047,81 @@
       throw new Error('Добавьте хотя бы один артикул перед экспортом.')
     }
 
-    var matrix = [headers]
+    var matrix = [
+      headers.map(function (text) {
+        return { type: 'string', value: text, style: EXCEL_STYLE_HEADER }
+      }),
+    ]
 
     bodyRows.forEach(function (tableRow) {
       var record = Array.from(tableRow.children).slice(1).map(function (cell, columnIndex) {
         var text = cell.textContent.replace(/\s+/g, ' ').trim()
-        if (text === '' || text === '—') return ''
+
+        // Красим значения «Изменение продаж»: рост — зелёным, падение — красным (как на экране).
+        var style = EXCEL_STYLE_DEFAULT
+        if (cell.querySelector('.sales-comparison--positive')) {
+          style = EXCEL_STYLE_POSITIVE
+        } else if (cell.querySelector('.sales-comparison--negative')) {
+          style = EXCEL_STYLE_NEGATIVE
+        }
+
+        if (text === '' || text === '—') {
+          return { type: 'string', value: '', style: EXCEL_STYLE_DEFAULT }
+        }
 
         if (EXCEL_NUMERIC_HEADERS[headers[columnIndex]]) {
           var normalized = text.replace(/[\s ]/g, '').replace(',', '.')
           var number = Number(normalized)
-          if (normalized !== '' && Number.isFinite(number)) return number
+          if (normalized !== '' && Number.isFinite(number)) {
+            return { type: 'number', value: number, style: style }
+          }
         }
 
-        return text
+        return { type: 'string', value: text, style: style }
       })
 
       matrix.push(record)
     })
 
-    var worksheet = XLSX.utils.aoa_to_sheet(matrix)
-    worksheet['!cols'] = headers.map(function (header) {
-      return { wch: Math.min(40, Math.max(12, header.length + 2)) }
+    var columnWidths = headers.map(function (header) {
+      return Math.min(40, Math.max(12, header.length + 2))
     })
 
-    var workbook = XLSX.utils.book_new()
-    XLSX.utils.book_append_sheet(workbook, worksheet, 'Retail')
-    XLSX.writeFile(workbook, 'retail-analytic.xlsx')
+    var zip = new JSZip()
+    zip.file('[Content_Types].xml',
+      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' +
+      '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>' +
+      '<Default Extension="xml" ContentType="application/xml"/>' +
+      '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>' +
+      '<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>' +
+      '<Override PartName="/xl/styles.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.styles+xml"/>' +
+      '</Types>')
+    zip.file('_rels/.rels',
+      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+      '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>' +
+      '</Relationships>')
+    zip.file('xl/workbook.xml',
+      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" ' +
+      'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">' +
+      '<sheets><sheet name="Retail" sheetId="1" r:id="rId1"/></sheets></workbook>')
+    zip.file('xl/_rels/workbook.xml.rels',
+      '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+      '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+      '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>' +
+      '<Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/styles" Target="styles.xml"/>' +
+      '</Relationships>')
+    zip.file('xl/styles.xml', buildStylesXml())
+    zip.file('xl/worksheets/sheet1.xml', buildSheetXml(matrix, columnWidths))
+
+    var blob = await zip.generateAsync({
+      type: 'blob',
+      compression: 'DEFLATE',
+      mimeType: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+    })
+    downloadBlob(blob, 'retail-analytic.xlsx')
   }
 
   async function readRetailFile(file, label) {
@@ -1151,7 +1296,7 @@
     }
   })
 
-  exportExcelButton.addEventListener('click', function () {
+  exportExcelButton.addEventListener('click', async function () {
     if (exportExcelButton.disabled) return
 
     var originalContents = exportExcelButton.innerHTML
@@ -1161,7 +1306,7 @@
     feedback.classList.remove('feedback--error')
 
     try {
-      exportTableToExcel()
+      await exportTableToExcel()
     } catch (error) {
       feedback.textContent = error instanceof Error ? error.message : 'Не удалось создать Excel.'
       feedback.classList.add('feedback--error')
