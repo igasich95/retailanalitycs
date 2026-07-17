@@ -864,7 +864,8 @@
 
     var sourceTable = tableBody.closest('table')
     var rows = Array.from(tableBody.querySelectorAll('tr:not(.add-row)'))
-    var tableWidth = Math.max(1320, sourceTable.scrollWidth)
+    // Фиксированная ширина PDF: одинаковая с мобилы и десктопа, чтобы вся таблица помещалась.
+    var tableWidth = 1560
     var pdf = new JsPdf({
       compress: true,
       format: 'a4',
