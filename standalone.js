@@ -30,6 +30,7 @@
   var resultsTitle = document.getElementById('results-title')
   var resultsMeta = document.getElementById('results-meta')
   var exportPdfButton = document.getElementById('export-pdf-button')
+  var exportExcelButton = document.getElementById('export-excel-button')
   var tableHead = document.getElementById('table-head')
   var tableBody = document.getElementById('table-body')
   var selectedFile = null
@@ -608,6 +609,7 @@
     var count = selectedArticleKeys.size
     resultsMeta.textContent = count + ' ' + getRowWord(count) + ' · Retail'
     exportPdfButton.disabled = count === 0
+    exportExcelButton.disabled = count === 0
   }
 
   function insertArticle(articleKey) {
@@ -921,6 +923,62 @@
     pdf.save('retail-analytic.pdf')
   }
 
+  // Колонки с числовыми данными — в Excel их выгружаем числами, а не текстом.
+  var EXCEL_NUMERIC_HEADERS = {
+    'Продажи Розница, руб.': true,
+    'Продажи Розница, шт': true,
+    'Остатки В РОЗНИЦЕ, шт': true,
+    'Остатки (Арвато основной), шт': true,
+  }
+
+  function exportTableToExcel() {
+    if (typeof XLSX === 'undefined') {
+      throw new Error('Не удалось загрузить модуль экспорта Excel.')
+    }
+
+    if (document.querySelector('.manual-sales-form')) {
+      throw new Error('Сначала сохраните введённое значение продаж.')
+    }
+
+    // Читаем уже собранную на экране таблицу, пропуская служебную колонку действий.
+    var headers = Array.from(tableHead.querySelectorAll('th')).slice(1).map(function (cell) {
+      return cell.textContent.trim()
+    })
+
+    var bodyRows = Array.from(tableBody.querySelectorAll('tr:not(.add-row)'))
+    if (bodyRows.length === 0) {
+      throw new Error('Добавьте хотя бы один артикул перед экспортом.')
+    }
+
+    var matrix = [headers]
+
+    bodyRows.forEach(function (tableRow) {
+      var record = Array.from(tableRow.children).slice(1).map(function (cell, columnIndex) {
+        var text = cell.textContent.replace(/\s+/g, ' ').trim()
+        if (text === '' || text === '—') return ''
+
+        if (EXCEL_NUMERIC_HEADERS[headers[columnIndex]]) {
+          var normalized = text.replace(/[\s ]/g, '').replace(',', '.')
+          var number = Number(normalized)
+          if (normalized !== '' && Number.isFinite(number)) return number
+        }
+
+        return text
+      })
+
+      matrix.push(record)
+    })
+
+    var worksheet = XLSX.utils.aoa_to_sheet(matrix)
+    worksheet['!cols'] = headers.map(function (header) {
+      return { wch: Math.min(40, Math.max(12, header.length + 2)) }
+    })
+
+    var workbook = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Retail')
+    XLSX.writeFile(workbook, 'retail-analytic.xlsx')
+  }
+
   async function readRetailFile(file, label) {
     var buffer = await file.arrayBuffer()
     var workbook = XLSX.read(buffer, { type: 'array' })
@@ -1090,6 +1148,26 @@
     } finally {
       exportPdfButton.innerHTML = originalContents
       exportPdfButton.disabled = selectedArticleKeys.size === 0
+    }
+  })
+
+  exportExcelButton.addEventListener('click', function () {
+    if (exportExcelButton.disabled) return
+
+    var originalContents = exportExcelButton.innerHTML
+    exportExcelButton.disabled = true
+    exportExcelButton.textContent = 'Создаём Excel…'
+    feedback.textContent = ''
+    feedback.classList.remove('feedback--error')
+
+    try {
+      exportTableToExcel()
+    } catch (error) {
+      feedback.textContent = error instanceof Error ? error.message : 'Не удалось создать Excel.'
+      feedback.classList.add('feedback--error')
+    } finally {
+      exportExcelButton.innerHTML = originalContents
+      exportExcelButton.disabled = selectedArticleKeys.size === 0
     }
   })
 
